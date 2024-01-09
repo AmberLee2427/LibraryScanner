@@ -1,5 +1,6 @@
 from _book import Book
 from _gui import GalleryGUI
+from _library import Library
 
 import tkinter as tk
 
@@ -12,6 +13,12 @@ if __name__ == "__main__":
     book_instance.get_data()
     book_instance.display_info()
 
+    # testing the Library class
+    new_library = Library()
+    isbns_to_query = ['978-1-60309-514-3', '978-1-60309-385-9', '978-1-60309-524-2']
+    new_library.add_books(isbns_to_query)
+
+    #testing the GUI
     root = tk.Tk()
     app = GalleryGUI(root)
     root.mainloop()

@@ -2,6 +2,7 @@ from tkinter import *
 import requests
 
 from _book import Book
+from _library import Library
 
 class GalleryGUI:
     def __init__(self, root):
@@ -9,29 +10,31 @@ class GalleryGUI:
         self.root = root
         self.root.title("Book Gallery")
 
-        self.books = []  # List to store Book objects
+        self.library = Library()
 
-        self.listbox = Listbox(root, height=10, selectmode=SINGLE)
+        self.listbox = Listbox(root, height=35, width=50, selectmode=SINGLE)
         self.listbox.pack(pady=10)
 
         self.add_button = Button(root, text="Add Book", command=self.add_book_button)
         self.add_button.pack(side=LEFT, padx=10)
         
         self.remove_button = Button(root, text="Remove Book", command=self.remove_book)
-        self.remove_button.pack(side=RIGHT, padx=10)
+        self.remove_button.pack(side=RIGHT, padx=10) 
 
-    def add_book(self,isbn):
-        book_instance = Book(isbn)
-        book_instance.get_data()
-        self.books.append(book_instance)
         self.update_listbox()
+        print('\n\n\n\n',self.library.books) 
 
     def add_book_button(self):
         isbn=StringVar()
         Label(self.root, text='Enter ISBN:').pack()
         Entry(self.root, textvariable=isbn).pack()
-        Button(self.root, text='Ok', command=lambda:self.add_book(isbn.get)).pack()
+        Button(self.root, text='Ok', command=lambda:self.library.add_book(isbn.get())).pack()
+        self.update_listbox()
  
+        def ok_button_action(self, isbn, add_book_window):
+            self.library.add_book(isbn)
+            add_book_window.destroy()
+            self.update_listbox()
     def remove_book(self):
         selected_index = self.listbox.curselection()
         del self.books[selected_index[0]]
@@ -39,5 +42,6 @@ class GalleryGUI:
 
     def update_listbox(self):
         self.listbox.delete(0, END)
-        for book in self.books:
+        for isbn in self.library.books:
+            book = self.library.books[isbn]
             self.listbox.insert(END, f"{book.title} ({book.isbn})")

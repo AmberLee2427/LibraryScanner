@@ -2,7 +2,7 @@ import requests
 
 class Book:
     def __init__(self, isbn, title=None, author=None, published=None, cover=None):
-        self.isbn = isbn
+        self.isbn = isbn.replace('-', '').replace(' ', '')
         self.title = title
         self.author = author
         self.published_date = published

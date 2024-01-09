@@ -1,5 +1,8 @@
 from tkinter import *
 import requests
+import os
+from PIL import Image, ImageTk
+from io import BytesIO
 
 from _book import Book
 from _library import Library
@@ -10,7 +13,10 @@ class GalleryGUI:
         self.root = root
         self.root.title("Book Gallery")
 
-        self.library = Library('LibraryScanner/library.csv')
+        self.root_path = 'LibraryScanner/'
+        self.library = Library(self.root_path+'library.csv')
+        self.covers_folder = self.root_path+'covers/'
+        self.get_covers() # checks for covers
 
         self.listbox = Listbox(root, height=35, width=50, selectmode=SINGLE)
         self.listbox.pack(pady=10)
@@ -22,7 +28,22 @@ class GalleryGUI:
         self.remove_button.pack(side=RIGHT, padx=10) 
 
         self.update_listbox()
-        print('\n\n\n\n',self.library.books) 
+        print('\n\n\n\n',self.library.books)
+
+    def get_covers(self):
+        for isbn in self.library.books:
+            cover_path = os.path.join(self.covers_folder, f"{isbn}.png")
+            if not os.path.exists(cover_path):
+                self.get_cover(isbn, cover_path)       
+
+    def get_cover(self, isbn, cover_path):
+        book = self.library.books[isbn]
+        cover_image_url = book.cover_image_url
+        if cover_image_url:
+            response = requests.get(cover_image_url)
+            response.raise_for_status()
+            image = Image.open(BytesIO(response.content))
+            image.save(cover_path)
 
     def add_book_button(self):
         new_window = Toplevel(self.root)
@@ -43,6 +64,7 @@ class GalleryGUI:
 
     def update_listbox(self):
         self.listbox.delete(0, END)
+        self.get_covers()
         for isbn in self.library.books:
             book = self.library.books[isbn]
             self.listbox.insert(END, f"{book.title} ({book.isbn})")

@@ -109,59 +109,11 @@ class GalleryGUI:
             self.update_canvas()  # Update canvas
             self.update_details_frame()  # Clear details frame
 
-    '''def update_canvas(self):
-        for widget in self.canvas.winfo_children():
-            widget.destroy()
-
-        row, col = 0, 0
-
-        for isbn in self.library.books:
-            book = self.library.books[isbn]
-
-            # Load cover image
-            cover_image_path = os.path.join(self.covers_folder, f"{isbn}.png")
-            if os.path.exists(cover_image_path):
-                img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((100, 150), Image.LANCZOS))
-                title_text = f"{book.title}"
-
-                # Wrap text not more than 150 pixels wide
-                title_label = Label(self.canvas, image=img, text=title_text, compound="top", padx=5, pady=5, font=("Helvetica", 10, "bold"), width=150, wraplength=150, bg="white")
-                title_label.image = img
-
-                # Calculate the height of the wrapped title
-                title_label.update_idletasks()  # Update to get accurate size
-                title_height = title_label.winfo_height()
-
-                # Bind the label to the book for selection
-                title_label.bind("<Button-1>", lambda event, b=book: self.select_book(b))
-
-                title_label.grid(row=row, column=col, padx=10, pady=5, sticky="n")
-
-                # Author label directly under title/cover combo, adjusting for title height
-                author_label = Label(self.canvas, text=book.author, font=("Helvetica", 10), bg="white")
-                author_label.grid(row=row + title_height, column=col, padx=10, pady=0, sticky="n")
-
-                # Bind the author label to the book for showing author books
-                author_label.bind("<Button-1>", lambda event, b=book: self.show_author_books(b.author))
-
-                col += 1
-                if col == 5:
-                    col = 0
-                    row += 2  # Adjusting row for the author label'''
-    
     def update_canvas(self):
         for widget in self.canvas.winfo_children():
             widget.destroy()
 
         row, col = 0, 0
-        vertical_gap = 10  # Adjust the vertical gap as needed
-        column_count = 5  # Number of columns
-
-        canvas_width = 163 * column_count  # Calculate canvas width based on the number of columns
-        canvas_height = 500  # Adjust the canvas height as needed
-
-        self.canvas_frame.config(width=canvas_width)
-        self.canvas.config(width=canvas_width, height=canvas_height)
 
         for isbn in self.library.books:
             book = self.library.books[isbn]
@@ -170,56 +122,47 @@ class GalleryGUI:
             cover_image_path = os.path.join(self.covers_folder, f"{isbn}.png")
             if os.path.exists(cover_image_path):
                 img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((100, 150), Image.LANCZOS))
-                title_text = f"{book.title}"
-                author_text = f"{book.author}"
 
-                # Create a frame for each book within the canvas
-                frame = Frame(self.canvas, bg="white", padx=10, pady=10)
-                self.canvas.create_window(col * 160, row * (160 + vertical_gap), anchor="nw", window=frame)
-
-                title_label = Label(frame, image=img, text=title_text, compound="top", padx=5, pady=5, font=("Helvetica", 14), width=150, wraplength=150, bg="white")
+                # Wrap text not more than 150 pixels wide
+                title_label = Label(self.canvas, image=img, compound="top", padx=5, pady=5, font=("Helvetica", 10, "bold"), width=150, wraplength=150, bg="white")
                 title_label.image = img
 
                 # Bind the label to the book for selection
                 title_label.bind("<Button-1>", lambda event, b=book: self.select_book(b))
-                title_label.pack(pady=(vertical_gap, 0))
 
-                # Author label directly below the title/cover with fixed vertical gap
-                author_label = Label(frame, text=author_text, font=("Helvetica", 12), bg="white")
-                author_label.pack(pady=(0, vertical_gap))
-
-                # Bind the author label to the book for showing author books
-                author_label.bind("<Button-1>", lambda event, b=book: self.show_author_books(b.author))
-
-                # Configure frame to have a fixed height including the gap
-                frame.update_idletasks()  # Ensure frame dimensions are updated
-                frame.config(height=frame.winfo_height())
+                title_label.grid(row=row, column=col, padx=10, pady=15, sticky="n")
 
                 col += 1
-                if col == column_count:
+                if col == 5:
                     col = 0
-                    row += 1  # Adjusting row for the author label
-
+                    row += 2  # Adjusting row for the author label
 
     def show_author_books(self, selected_author):
         author_books = [book for isbn, book in self.library.books.items() if book.author == selected_author]
 
         new_window = Toplevel(self.root)
+        new_window.geometry("775x600")
         new_canvas = Canvas(new_window, bg="white")
         new_canvas.pack(fill=BOTH, expand=True)
 
+        col, row = 0, 0
         for row, book in enumerate(author_books):
             cover_image_path = os.path.join(self.covers_folder, f"{book.isbn}.png")
             if os.path.exists(cover_image_path):
                 img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((100, 150), Image.LANCZOS))
                 title_text = f"{book.title}"
 
-                title_label = Label(new_canvas, image=img, text=title_text, compound="top", padx=5, pady=5, font=("Helvetica", 14), width=150, wraplength=150, bg="white")
+                title_label = Label(new_canvas, image=img, text=title_text, compound="top", padx=5, pady=5, font=("Helvetica", 10), width=150, wraplength=150, bg="white")
                 title_label.image = img
 
                 title_label.bind("<Button-1>", lambda event, b=book: self.select_book(b))
 
                 title_label.grid(row=row, padx=10, pady=5, sticky="n")
+
+                col += 1
+                if col == 5:
+                    col = 0
+                    row += 1
 
         new_window.mainloop()
 
@@ -254,6 +197,9 @@ class GalleryGUI:
 
             author_label = Label(self.details_frame, text=f"{self.selected_book.author}", font=("Helvetica", 12), bg="white")
             author_label.pack()
+
+            # Bind the author label to the book for showing author books
+            author_label.bind("<Button-1>", lambda event, b=self.selected_book: self.show_author_books(b.author))
 
             ISBN_label = Label(self.details_frame, text=f"ISBN: {self.selected_book.isbn}", font=("Helvetica", 8), bg="white")
             ISBN_label.pack()

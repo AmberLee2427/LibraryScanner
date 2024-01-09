@@ -20,5 +20,6 @@ if __name__ == "__main__":
 
     #testing the GUI
     root = tk.Tk()
+    root.geometry("1242x600")
     app = GalleryGUI(root)
     root.mainloop()

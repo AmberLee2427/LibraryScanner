@@ -19,6 +19,8 @@ class Library:
                 pass
         self.load_books(library_file)
 
+        self.sort_books('title')
+
     def load_books(self,library_file=None):
         ''' can be used to merge multiple library_files'''
         if library_file is None:
@@ -42,6 +44,12 @@ class Library:
         DEPENDENCIES
         -------------
         csv
+
+        OPTIONAL INPUTS
+        ----------------
+        save_as:        type: boolean/string
+                        contains: *file_path* of type string to save the library csv to;
+                                    False (defaul) saves to './library.csv'
         '''
 
         if save_as:  # True for strings
@@ -61,6 +69,27 @@ class Library:
                     , 'published':book.published_date, 'cover':book.cover_image_url}
         # will need to add extra columns later
         return dic_book
+    
+    def sort_books(self, key, reverse=False):
+        '''Sort the books based on the specified key and order.
+
+        INPUTS
+        -------
+        key:        type: string
+                    contains: the key to sort the books by 
+                                (e.g., 'title', 'author', 'published_date').
+
+        OPTIONAL INPUTS
+        ----------------
+        reverse:    type: boolean
+                    contains: True, if sorting in descending order; 
+                                False (default), if sorting in ascending order.
+        '''
+        if key not in self.header:
+            raise ValueError(f"Invalid key '{key}'. Supported keys: {', '.join(self.header)}")
+
+        # Sort books based on the specified key
+        self.books = dict(sorted(self.books.items(), key=lambda x: getattr(x[1], key), reverse=reverse))
 
     def add_book(self, isbn, save=True):
         if not (isbn in self.books.keys()):
@@ -77,8 +106,8 @@ class Library:
         ''' adds all the books in the provided list to the library file. 
          Saves once at the end of the process
 
-         INPUT
-         ------
+         INPUTS
+         -------
          isbn_book_list:    type: list
                             subtype: string (10 or 13 digit real, whole numbers)
                             contains: a list of ISBN numbers as strings
@@ -87,3 +116,17 @@ class Library:
         for book_isbn in isbn_book_list:
             self.add_book(book_isbn, save=False)
         self.save_library()
+
+    def remove_book(self,isbn):
+        '''Remove a book from the library.
+
+        INPUTS
+        -------
+        isbn:       type: string
+                    contains: the ISBN of the book to be removed.
+        '''
+        if isbn in self.books:
+            del self.books[isbn]
+            self.save_library()
+        else:
+            print(f"Book with ISBN {isbn} not found in the library.")

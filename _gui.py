@@ -10,7 +10,7 @@ class GalleryGUI:
         self.root = root
         self.root.title("Book Gallery")
 
-        self.library = Library()
+        self.library = Library('LibraryScanner/library.csv')
 
         self.listbox = Listbox(root, height=35, width=50, selectmode=SINGLE)
         self.listbox.pack(pady=10)
@@ -25,16 +25,17 @@ class GalleryGUI:
         print('\n\n\n\n',self.library.books) 
 
     def add_book_button(self):
+        new_window = Toplevel(self.root)
         isbn=StringVar()
-        Label(self.root, text='Enter ISBN:').pack()
-        Entry(self.root, textvariable=isbn).pack()
-        Button(self.root, text='Ok', command=lambda:self.library.add_book(isbn.get())).pack()
+        Label(new_window, text='Enter ISBN:').pack()
+        Entry(new_window, textvariable=isbn).pack()
+        Button(new_window, text='Ok', command=lambda: self.add_book_ok_button(isbn.get(), new_window)).pack()
+
+    def add_book_ok_button(self, isbn, new_window):
+        self.library.add_book(isbn)
         self.update_listbox()
- 
-        def ok_button_action(self, isbn, add_book_window):
-            self.library.add_book(isbn)
-            add_book_window.destroy()
-            self.update_listbox()
+        new_window.destroy()
+        
     def remove_book(self):
         selected_index = self.listbox.curselection()
         del self.books[selected_index[0]]

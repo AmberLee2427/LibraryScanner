@@ -1,5 +1,7 @@
 import csv
 import os
+import requests
+from collections import namedtuple
 
 from _book import Book
 
@@ -9,9 +11,18 @@ class Library:
         if library_file is None:
             library_file = 'library.csv'
         self.library_file = library_file
+        self.pickle = 'library.pickle'
 
-        self.books = {}  # empty shelves
-        self.header = ['isbn', 'title', 'author', 'published', 'cover']  # the basic header
+        self.books = []  # empty shelves
+        self.header = ['isbn', 'title', 'author', 'published_date', 'description', \
+                       'page_count', 'average_rating', 'ratings_count', 'categories', \
+                        'maturity_rating']
+        
+        self.user_specific = []
+        self.empty_field = []
+        self.user_fields = []  # e.g. user rating, user review, loaned to ...
+
+        self.database_type = 'pickle'  # or 'csv'
 
         if not os.path.exists(library_file):
             # Create an empty CSV file
@@ -21,22 +32,37 @@ class Library:
 
         self.sort_books('title')
 
-    def load_books(self,library_file=None):
+    def load_books(self,csv_file=None, pickle_file=None):
         ''' can be used to merge multiple library_files'''
-        if library_file is None:
-             library_file = self.library_file
+        if csv_file is None:
+            csv_file = self.library_file
+        if pickle_file is None:
+            pickle_file = self.pickle
 
-        with open(library_file, 'r', newline='') as file:
-            reader = csv.DictReader(file) 
-            for row in reader:
-                # need to reslove duplicates
-                self.books[row['isbn']] = Book(row['isbn'], title=row['title'], author=row['author']\
-                                               , published=row['published'], cover=row['cover'])
+        if self.database_type == 'csv':
+            try:
+                with open(csv_file, 'r', newline='') as file:
+                    reader = csv.DictReader(file)
+            except Exception as e:
+                print("Error during loading of csv:", e)
+            else:
+                for row in reader:
+                    # need to reslove duplicates
+                    self.books.append(row)
+
+        elif self.database_type == 'pickle':
+            try:
+                with open(pickle_file, "rb") as f:
+                    pickle.load(f)
+            except Exception as e:
+                print("Error during unpickling object (Possibly unsupported):", e)
+            else:
+                for row in f.books:
+                    # check the book entry is unique
+                    #
+
+                    self.book.append(row)
             
-            #new_header = row.keys()
-            # will need to resolve header merging when extra columns are optionally added
-            
-            # will need to tack on extra column options when added.
 
     def save_library(self, save_as=False):
         ''' overwrites the library csv file (self.library_file; default='Library.csv')
@@ -53,22 +79,26 @@ class Library:
         '''
 
         if save_as:  # True for strings
-             file_path = save_as
-        else:
-             file_path = self.library_file
-        with open(file_path, 'w', newline='') as file:
-                    writer = csv.DictWriter(file, fieldnames=self.header)
-                    writer.writeheader()
-                    for isbn in self.books:
-                        book = self.books[isbn]
-                        #print(self.book_to_dict(book))
-                        writer.writerow(self.book_to_dict(book))
+            file_path = save_as
+        elif self.database_type == 'csv':
+            file_path = self.library_file
+        elif self.database_type == 'pickle':
+            file_path = self.pickle
 
-    def book_to_dict(self, book):
-        dic_book = {'isbn': book.isbn, 'title': book.title, 'author':book.author\
-                    , 'published':book.published_date, 'cover':book.cover_image_url}
-        # will need to add extra columns later
-        return dic_book
+        if self.database_type == 'csv':  
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=self.header)
+                writer.writeheader()
+                for book in self.books:
+                    writer.writerow(book)
+
+        # save pickle instead
+        elif self.database_type == 'pickle':
+            try:
+                with open("data.pickle", "wb") as f:
+                    pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+            except Exception as e:
+                print("Error during pickling object (Possibly unsupported):", e)
     
     def sort_books(self, key, reverse=False):
         '''Sort the books based on the specified key and order.
@@ -91,15 +121,60 @@ class Library:
         # Sort books based on the specified key
         self.books = dict(sorted(self.books.items(), key=lambda x: getattr(x[1], key), reverse=reverse))
 
-    def add_book(self, isbn, save=True):
-        if not (isbn in self.books.keys()):
-            book_object = Book(isbn)
-            book_object.get_data()
+    def add_field(self, field, empty=None):
+        '''
+        INPUTS
+        -------
+        field:      type: string
+                    contains: a name for the new field
 
-            self.books[isbn] = book_object 
+        OPTIONAL INPUTS
+        ----------------
+        empty:      type: any (default is None)
+                    contains: an empty item of the data type intended for this field
+
+        '''
+        self.user_fields = field
+        self.empty_field = empty
+
+        # add field to existing books
+        #load library
+        #save library
+
+    def remove_field(self, field):
+        ''' '''
+        pass
+
+    def rename_field(self, old_field, new_field):
+        ''' '''
+        pass
+
+    def add_book(self, isbn, save=True):
+        ''' adds a book to the class dictionary self.books, by fetching meta data 
+        using the class function get_book_data, and creating a blank user_data dict.
         
-            if save:
-                self.save_library()
+        INPUTS
+        -------
+        isbn        type: string
+
+        OPTIONAL INPUTS
+        ----------------
+        save:       type: boolean
+        '''
+        if not (isbn in self.books.keys()): # if not already in the self.books dictionary
+            # API metadata
+            api_data = self.get_book_data(isbn)  # uses the Google books API
+            if api_data is not None:
+                self.books.append(api_data) 
+
+                # empty user data
+                user_data = {}
+                for i, field in enumerate(self.user_fields):
+                    user_data[field] = self.empty_field[i]
+                self.user_specific.append(user_data)
+            
+                if save:
+                    self.save_library()
         #else:  # add a copies column
 
     def add_books(self,isbn_book_list):
@@ -116,6 +191,130 @@ class Library:
         for book_isbn in isbn_book_list:
             self.add_book(book_isbn, save=False)
         self.save_library()
+
+    def get_book_data(self, isbn):
+        ''' Uses the 'isbn' variable to query the Google Books catalogue
+        
+        INPUTS
+        -------
+        isbn:       type: string (10 or 13 digit real, whole numbers)
+                    contains: book ISBN as a string
+
+        DEPENDENCIES
+        -------------
+        requests
+        collection.namedtuple - or not
+
+        NOTES
+        ------
+        Google Books API documentation:
+        https://developers.google.com/books/docs/v1/using
+
+        When trying decide which credentials to create for Google Cloud JSON API
+        (https://console.cloud.google.com/apis/credentials?project=pythonlibraryscanner), 
+        the recommendation is:
+            This API doesn't require that you create credentials. 
+            You're already good to go!
+
+        The JSON includes a bunch of shit. It gets converted into a dict by requests.
+        The dictionary contains:
+            * 'kind',               (str: I'm guessing this API isn't just used for books)
+            * 'totalItems',         (int: I'm guessing this is only ever 1 for books)
+            * 'items'.              (list: this is a list of length totalItems)
+        Each item in the list is a dict containing:
+            * 'kind',               (str: same as above)
+            * 'id',                 (str)
+            * 'etag',               (str)
+            * 'selfLink',           (str: url)
+            * 'volumeInfo',         (dic)
+            * 'saleInfo',           (price stuff)
+            * 'accessInfo',         (info about api call)
+            * 'searchInfo'.         (google search stuff)
+        The important stuff seems to be in dict['items'][0]['volumeInfo'], which contains:
+
+        I don't know why there would ever be more than one item.
+        volume_info contains:
+            * 'title',              (str)
+            * 'subtitle',           (str: nonsense)
+            * 'authors',            (list: of strings with auhtor names)
+            * 'publisher',          (str)
+            * 'publishedDate',      (str: e.g. '2016', '2016-03-21')
+            * 'description',        (str: contains blurb)
+            * 'industryIdentifiers',(list: containing dictionaries with entries for type and identifier, e.g. ISBN-10)
+            * 'readingModes',       (dict: ?)
+            * 'pageCount',          (int)
+            * 'printType',          (str: 'BOOK')
+            * 'categories',         (list of strings e.g. 'Fiction')
+            * 'averageRating',      (float)
+            * 'ratingsCount',       (int)
+            * 'maturityRating',     (str: e.g. 'NOT_MATURE')
+            * 'allowAnonLogging',   (bool)
+            * 'contentVersion',     (str)
+            * 'panelizationSummary',(dict: ?)
+            * 'imageLinks',         (dict: contains str of URLs to cover images)
+                                    (keys: e.g 'smallTumbnail', 'thumbnail')
+            * 'language',           (str: e.g. 'en')
+            * 'previewLink',        (str: URLs)
+            * 'infoLink',           (str: URLs)
+            * 'canonicalVolumeLink'.(str: URLs) 
+        '''
+        api_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
+
+        try:
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Extract relevant information from the API response
+            book_info = data['items'][0]['volumeInfo']
+            title = book_info.get('title', 'N/A')
+            author = ', '.join(book_info.get('authors', ['N/A']))
+            published_date = book_info.get('publishedDate', 'N/A')
+            description = book_info.get('description', 'N/A')
+            page_count = book_info.get('pageCount', 'N/A')
+            average_rating = book_info.get('averageRating', 'N/A')
+            ratings_count = book_info.get('ratingsCount', 'N/A')
+            categories = book_info.get('categories', 'N/A')
+            maturity_rating = book_info.get('maturityRating', 'N/A')
+
+            # Choose the largest available cover image size
+            # https://stackoverflow.com/questions/10721886/how-to-get-the-extra-large-cover-image-from-google-book-api
+            image_links = book_info.get('imageLinks', {})
+            sizes = ['extraLarge', 'large', 'medium', 'small', 'thumbnail', 'smallThumbnail']
+            finding_biggest = True
+            i = 0
+            while finding_biggest:
+                size = sizes[i]
+                if size in image_links:
+                    cover_image_url = image_links[size]
+                    # The api will just give you the biggest image it has up to the number you set. 
+                    # You can also set the height if you need to using e.g., '&fife=h900' 
+                    # and both with e.g., '&fife=w800-h900'
+                    cover_image_url = cover_image_url +'&fife=w600'
+                    finding_biggest = False
+                i += 1
+                if i > len(sizes):  # cover image not found
+                    cover_image_url = None
+                    finding_biggest = False
+
+            #Book = namedtuple("Book", self.header)
+            #book = Book(isbn, title, author, published_date, description, page_count,\
+            #        average_rating, ratings_count, categories, maturity_rating)
+                    
+            # book as a dictionary
+            meta_data_list = [isbn, title, author, published_date, description, \
+                              page_count, average_rating, ratings_count, categories, \
+                                maturity_rating]
+            book = {}
+            for i, key in enumerate(self.header):
+                book[key] = meta_data_list[i]
+
+            return book
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error retrieving data from Google Books API: {e}")
+
+            return None
 
     def remove_book(self,isbn):
         '''Remove a book from the library.

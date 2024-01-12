@@ -2,21 +2,24 @@ import csv
 import os
 import requests
 from collections import namedtuple
+import pickle
 
 from _book import Book
 
 class Library:
     def __init__(self, library_file=None):
         
+        self.csv = 'library.csv'
         if library_file is None:
-            library_file = 'library.csv'
+            library_file = self.csv
         self.library_file = library_file
         self.pickle = 'library.pickle'
 
         self.books = []  # empty shelves
         self.header = ['isbn', 'title', 'author', 'published_date', 'description', \
                        'page_count', 'average_rating', 'ratings_count', 'categories', \
-                        'maturity_rating']
+                        'maturity_rating', 'cover']
+        self.book_keys = []
         
         self.user_specific = []
         self.empty_field = []
@@ -24,45 +27,40 @@ class Library:
 
         self.database_type = 'pickle'  # or 'csv'
 
-        if not os.path.exists(library_file):
+        if os.path.exists(library_file):
+            self.load_books(library_file)
+        else:
             # Create an empty CSV file
             with open(library_file, 'w', newline=''):
                 pass
-        self.load_books(library_file)
 
         self.sort_books('title')
 
-    def load_books(self,csv_file=None, pickle_file=None):
+    def load_books(self,library_file=None):
         ''' can be used to merge multiple library_files'''
-        if csv_file is None:
-            csv_file = self.library_file
-        if pickle_file is None:
-            pickle_file = self.pickle
 
-        if self.database_type == 'csv':
+        if '.csv' in library_file:
             try:
-                with open(csv_file, 'r', newline='') as file:
+                with open(library_file, 'r', newline='') as file:
                     reader = csv.DictReader(file)
+                    for row in reader:
+                        # need to reslove duplicates
+                        if row['isbn'] in self.book_keys:
+                            pass
+                        else:
+                            self.books.append(row)
+                            self.book_keys.append(row['isbn'])
             except Exception as e:
-                print("Error during loading of csv:", e)
-            else:
-                for row in reader:
-                    # need to reslove duplicates
-                    self.books.append(row)
+                print("Error during loading of csv:", e)                
 
-        elif self.database_type == 'pickle':
+        else:
             try:
-                with open(pickle_file, "rb") as f:
-                    pickle.load(f)
+                with open(library_file, "rb") as f:
+                    loaded_data = pickle.load(f)
+                    self.books.extend(loaded_data.books)
+                    self.book_keys.extend([book['isbn'] for book in loaded_data.books])
             except Exception as e:
-                print("Error during unpickling object (Possibly unsupported):", e)
-            else:
-                for row in f.books:
-                    # check the book entry is unique
-                    #
-
-                    self.book.append(row)
-            
+                print("Error during unpickling object (Possibly unsupported):", e) 
 
     def save_library(self, save_as=False):
         ''' overwrites the library csv file (self.library_file; default='Library.csv')
@@ -81,11 +79,11 @@ class Library:
         if save_as:  # True for strings
             file_path = save_as
         elif self.database_type == 'csv':
-            file_path = self.library_file
+            file_path = self.csv
         elif self.database_type == 'pickle':
             file_path = self.pickle
 
-        if self.database_type == 'csv':  
+        if 'csv' in file_path:  
             with open(file_path, 'w', newline='') as file:
                 writer = csv.DictWriter(file, fieldnames=self.header)
                 writer.writeheader()
@@ -93,9 +91,9 @@ class Library:
                     writer.writerow(book)
 
         # save pickle instead
-        elif self.database_type == 'pickle':
+        else:
             try:
-                with open("data.pickle", "wb") as f:
+                with open(file_path, "wb") as f:
                     pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
             except Exception as e:
                 print("Error during pickling object (Possibly unsupported):", e)
@@ -119,7 +117,7 @@ class Library:
             raise ValueError(f"Invalid key '{key}'. Supported keys: {', '.join(self.header)}")
 
         # Sort books based on the specified key
-        self.books = dict(sorted(self.books.items(), key=lambda x: getattr(x[1], key), reverse=reverse))
+        self.books = sorted(self.books, key=lambda x: x.get(key, ''), reverse=reverse)
 
     def add_field(self, field, empty=None):
         '''
@@ -161,20 +159,23 @@ class Library:
         ----------------
         save:       type: boolean
         '''
-        if not (isbn in self.books.keys()): # if not already in the self.books dictionary
+        if not (isbn in self.book_keys): # if not already in the self.books list
+            self.book_keys.append(isbn)
+
             # API metadata
             api_data = self.get_book_data(isbn)  # uses the Google books API
             if api_data is not None:
-                self.books.append(api_data) 
+                # add 
+                self.books.append(api_data)
 
-                # empty user data
-                user_data = {}
-                for i, field in enumerate(self.user_fields):
-                    user_data[field] = self.empty_field[i]
-                self.user_specific.append(user_data)
+            # empty user data
+            user_data = {}
+            for i, field in enumerate(self.user_fields):
+                user_data[field] = self.empty_field[i]
+            self.user_specific.append(user_data)
             
-                if save:
-                    self.save_library()
+            if save:
+                self.save_library()
         #else:  # add a copies column
 
     def add_books(self,isbn_book_list):
@@ -189,8 +190,7 @@ class Library:
         '''
 
         for book_isbn in isbn_book_list:
-            self.add_book(book_isbn, save=False)
-        self.save_library()
+            self.add_book(book_isbn, save=True)
 
     def get_book_data(self, isbn):
         ''' Uses the 'isbn' variable to query the Google Books catalogue
@@ -304,7 +304,7 @@ class Library:
             # book as a dictionary
             meta_data_list = [isbn, title, author, published_date, description, \
                               page_count, average_rating, ratings_count, categories, \
-                                maturity_rating]
+                                maturity_rating, cover_image_url]
             book = {}
             for i, key in enumerate(self.header):
                 book[key] = meta_data_list[i]
@@ -324,8 +324,16 @@ class Library:
         isbn:       type: string
                     contains: the ISBN of the book to be removed.
         '''
-        if isbn in self.books:
-            del self.books[isbn]
+        if isbn in self.book_keys:
+            # remove entry for self.books
+            for i, book in enumerate(self.books):
+                if book['isbn'] == isbn:
+                    del self.books[i]
+
+            # remove entry from keys
+            del self.book_keys[self.book_keys.index(isbn)]
+
+            # update programe data
             self.save_library()
         else:
             print(f"Book with ISBN {isbn} not found in the library.")

@@ -12,8 +12,8 @@ class GalleryGUI:
         self.root.geometry("1242x600")
         self.root.title("Book Gallery")
 
-        self.root_path = 'LibraryScanner/'
-        self.library = Library(self.root_path+'library.csv')
+        self.root_path = './'
+        self.library = Library(self.root_path+'library.pickle')
         self.covers_folder = self.root_path+'covers/'
         self.get_covers()  # Checks for covers
 
@@ -56,14 +56,17 @@ class GalleryGUI:
         self.update_canvas()
 
     def get_covers(self):
-        for isbn in self.library.books:
-            cover_path = os.path.join(self.covers_folder, f"{isbn}.png")
-            if not os.path.exists(cover_path):
-                self.get_cover(isbn, cover_path)
+        for book in self.library.books:
+            isbn = book['isbn']
+            if book['cover'] == '':
+                cover_path = os.path.join(self.covers_folder, "0.jpg")
+            else:
+                cover_path = os.path.join(self.covers_folder, f"{isbn}.png")
+                if not os.path.exists(cover_path):
+                    self.get_cover(book, cover_path)
 
-    def get_cover(self, isbn, cover_path):
-        book = self.library.books[isbn]
-        cover_image_url = book.cover_image_url
+    def get_cover(self, book, cover_path):
+        cover_image_url = book['cover']
         if cover_image_url:
             response = requests.get(cover_image_url)
             response.raise_for_status()
@@ -89,6 +92,7 @@ class GalleryGUI:
         self.update_canvas()
 
     def add_book_button(self):
+        ''' button set up'''
         new_window = Toplevel(self.root)
         isbn = StringVar()
         Label(new_window, text='Enter ISBN:').pack()
@@ -96,16 +100,32 @@ class GalleryGUI:
         Button(new_window, text='Ok', command=lambda: self.add_book_ok_button(isbn.get(), new_window)).pack()
 
     def add_book_ok_button(self, isbn, new_window):
-        self.library.add_book(isbn)
-        self.get_covers()  # Update covers
-        self.update_canvas()  # Update canvas
+        ''' button function'''
+        # Multiple coma seperated entries
+        if ',' in isbn:
+            isbns = isbn.split('.')
+            for isbn in isbns:
+                self.get_book(isbn)
+        # Single entry
+        else:
+            self.get_book(isbn)
+        
+        # Update GUI
+        self.update_canvas()
         new_window.destroy()
+
+    def get_book(self, isbn):
+        ''' getting the new book data and cover'''
+        isbn = isbn.replace(" ","")  # clean the string
+        self.library.add_book(isbn)
+        book = self.library.books[-1]
+        cover_path = os.path.join(self.covers_folder, f"{isbn}.png")
+        self.get_cover(book, cover_path)  # Get cover for new book
 
     def remove_book(self):
         if self.selected_book:
             self.library.remove_book(self.selected_book.isbn)
             self.selected_book = None  # Clear the selection
-            self.get_covers()  # Update covers
             self.update_canvas()  # Update canvas
             self.update_details_frame()  # Clear details frame
 
@@ -115,8 +135,8 @@ class GalleryGUI:
 
         row, col = 0, 0
 
-        for isbn in self.library.books:
-            book = self.library.books[isbn]
+        for book in self.library.books:
+            isbn = book['isbn']
 
             # Load cover image
             cover_image_path = os.path.join(self.covers_folder, f"{isbn}.png")
@@ -138,7 +158,10 @@ class GalleryGUI:
                     row += 2  # Adjusting row for the author label
 
     def show_author_books(self, selected_author):
-        author_books = [book for isbn, book in self.library.books.items() if book.author == selected_author]
+        author_books = []
+        for book in self.library.books:
+            if book['author'] == selected_author:
+                author_books.append(book)
 
         new_window = Toplevel(self.root)
         new_window.geometry("775x600")
@@ -147,10 +170,10 @@ class GalleryGUI:
 
         col, row = 0, 0
         for row, book in enumerate(author_books):
-            cover_image_path = os.path.join(self.covers_folder, f"{book.isbn}.png")
+            cover_image_path = os.path.join(self.covers_folder, f"{book['isbn']}.png")
             if os.path.exists(cover_image_path):
                 img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((100, 150), Image.LANCZOS))
-                title_text = f"{book.title}"
+                title_text = f"{book['title']}"
 
                 title_label = Label(new_canvas, image=img, text=title_text, compound="top", padx=5, pady=5, font=("Helvetica", 10), width=150, wraplength=150, bg="white")
                 title_label.image = img
@@ -182,29 +205,29 @@ class GalleryGUI:
         self.details_frame.config(width=380, height=600)
 
         if self.selected_book:
-            title_label = Label(self.details_frame, text=f"{self.selected_book.title}", font=("Helvetica", 14, "bold"), bg="white", wraplength=350)
+            title_label = Label(self.details_frame, text=f"{self.selected_book['title']}", font=("Helvetica", 14, "bold"), bg="white", wraplength=350)
             title_label.update_idletasks()  # Ensure frame dimensions are updated
             title_label.config(width=380)
             title_label.pack(fill=X,side=TOP)
 
             # Load larger cover image
-            cover_image_path = os.path.join(self.covers_folder, f"{self.selected_book.isbn}.png")
+            cover_image_path = os.path.join(self.covers_folder, f"{self.selected_book['isbn']}.png")
             if os.path.exists(cover_image_path):
                 larger_img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((200, 300), Image.LANCZOS))
                 larger_cover_label = Label(self.details_frame, image=larger_img, bg="white")
                 larger_cover_label.image = larger_img
                 larger_cover_label.pack(pady=10, fill=BOTH)
 
-            author_label = Label(self.details_frame, text=f"{self.selected_book.author}", font=("Helvetica", 12), bg="white")
+            author_label = Label(self.details_frame, text=f"{self.selected_book['author']}", font=("Helvetica", 12), bg="white")
             author_label.pack()
 
             # Bind the author label to the book for showing author books
-            author_label.bind("<Button-1>", lambda event, b=self.selected_book: self.show_author_books(b.author))
+            author_label.bind("<Button-1>", lambda event, b=self.selected_book: self.show_author_books(b['author']))
 
-            ISBN_label = Label(self.details_frame, text=f"ISBN: {self.selected_book.isbn}", font=("Helvetica", 8), bg="white")
+            ISBN_label = Label(self.details_frame, text=f"ISBN: {self.selected_book['isbn']}", font=("Helvetica", 8), bg="white")
             ISBN_label.pack()
 
-            pub_date_label = Label(self.details_frame, text=f"Publication Date: {self.selected_book.published_date}", font=("Helvetica", 8), bg="white")
+            pub_date_label = Label(self.details_frame, text=f"Publication Date: {self.selected_book['published']}", font=("Helvetica", 8), bg="white")
             pub_date_label.pack()
 
 if __name__ == "__main__":

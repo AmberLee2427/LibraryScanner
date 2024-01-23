@@ -92,12 +92,21 @@ class GalleryGUI:
         self.update_canvas()
 
     def add_book_button(self):
-        ''' button set up'''
         new_window = Toplevel(self.root)
         isbn = StringVar()
-        Label(new_window, text='Enter ISBN:').pack()
-        Entry(new_window, textvariable=isbn).pack()
-        Button(new_window, text='Ok', command=lambda: self.add_book_ok_button(isbn.get(), new_window)).pack()
+        label = Label(new_window, text='Enter ISBN:')
+        label.pack()
+        entry = Entry(new_window, textvariable=isbn)
+        entry.pack()
+
+        # Set the focus on the Entry widget
+        entry.focus_set()
+
+        # Bind the Enter key to call add_book_ok_button
+        new_window.bind("<Return>", lambda event: self.add_book_ok_button(isbn.get(), new_window))
+
+        ok_button = Button(new_window, text='Ok', command=lambda: self.add_book_ok_button(isbn.get(), new_window))
+        ok_button.pack()
 
     def add_book_ok_button(self, isbn, new_window):
         ''' button function'''
@@ -124,7 +133,7 @@ class GalleryGUI:
 
     def remove_book(self):
         if self.selected_book:
-            self.library.remove_book(self.selected_book.isbn)
+            self.library.remove_book(self.selected_book['isbn'])
             self.selected_book = None  # Clear the selection
             self.update_canvas()  # Update canvas
             self.update_details_frame()  # Clear details frame
@@ -200,35 +209,69 @@ class GalleryGUI:
     def update_details_frame(self):
         for widget in self.details_frame.winfo_children():
             widget.destroy()
-
+    
         self.sidebar.config(width=400)
         self.details_frame.config(width=380, height=600)
+        canvas = Canvas(self.details_frame, bg="white", width=380, height=600)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        # Create a Scrollbar widget and configure it for the canvas
+        scrollbar = Scrollbar(self.details_frame, command=canvas.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Create a frame to contain the content inside the canvas
+        inner_frame = Frame(canvas, bg="white")
+        canvas.create_window((0, 0), window=inner_frame, anchor='nw')
 
         if self.selected_book:
-            title_label = Label(self.details_frame, text=f"{self.selected_book['title']}", font=("Helvetica", 14, "bold"), bg="white", wraplength=350)
+            # i don't know why but the scrolling stuff doesn't show if this isn't here
+            title_label = Label(canvas, text=f"", font=("Helvetica", 1), bg="white")
             title_label.update_idletasks()  # Ensure frame dimensions are updated
-            title_label.config(width=380)
-            title_label.pack(fill=X,side=TOP)
+            title_label.config(width=300)
+            title_label.pack()
+
+            title_label = Label(inner_frame, text=f"{self.selected_book['title']}", font=("Helvetica", 14, "bold"), bg="white", wraplength=300)
+            title_label.pack(pady=10)
 
             # Load larger cover image
             cover_image_path = os.path.join(self.covers_folder, f"{self.selected_book['isbn']}.png")
             if os.path.exists(cover_image_path):
                 larger_img = ImageTk.PhotoImage(Image.open(cover_image_path).resize((200, 300), Image.LANCZOS))
-                larger_cover_label = Label(self.details_frame, image=larger_img, bg="white")
+                larger_cover_label = Label(inner_frame, image=larger_img, bg="white")
                 larger_cover_label.image = larger_img
                 larger_cover_label.pack(pady=10, fill=BOTH)
 
-            author_label = Label(self.details_frame, text=f"{self.selected_book['author']}", font=("Helvetica", 12), bg="white")
+            author_label = Label(inner_frame, text=f"{self.selected_book['author']}", font=("Helvetica", 12), bg="white")
             author_label.pack()
 
             # Bind the author label to the book for showing author books
             author_label.bind("<Button-1>", lambda event, b=self.selected_book: self.show_author_books(b['author']))
 
-            ISBN_label = Label(self.details_frame, text=f"ISBN: {self.selected_book['isbn']}", font=("Helvetica", 8), bg="white")
+            if self.selected_book['average_rating'] != 'N/A':
+                rating_label = Label(inner_frame, text=f"Rating: {self.selected_book['average_rating']} ({self.selected_book['ratings_count']})", font=("Helvetica", 8), bg="white", wraplength=300)
+                rating_label.pack()
+
+            description_label = Label(inner_frame, text=f"{self.selected_book['description']}", font=("Helvetica", 10), bg="white", wraplength=300)
+            description_label.pack()
+
+            ISBN_label = Label(inner_frame, text=f"ISBN: {self.selected_book['isbn']}", font=("Helvetica", 8), bg="white")
             ISBN_label.pack()
 
-            pub_date_label = Label(self.details_frame, text=f"Publication Date: {self.selected_book['published']}", font=("Helvetica", 8), bg="white")
+            if self.selected_book['page_count'] != 0:
+                pub_date_label = Label(inner_frame, text=f"Published: {self.selected_book['published_date']}    ({self.selected_book['page_count']} pages)", font=("Helvetica", 8), bg="white")
+            else:
+                pub_date_label = Label(inner_frame, text=f"Published: {self.selected_book['published_date']}", font=("Helvetica", 8), bg="white")
             pub_date_label.pack()
+
+        # Update the scroll region of the canvas
+        canvas.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+
+        # Bind mouse wheel scrolling to the canvas
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+
+            
 
 if __name__ == "__main__":
     root = Tk()
